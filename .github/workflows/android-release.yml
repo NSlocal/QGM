@@ -7,15 +7,14 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Java 17
+      - name: Set up Java 17 + OpenSSL
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: ✅ BUAT KEYSTORE + CERT + PEM + ZIP
+      - name: ✅ BUAT KEYSTORE + CERT + PEM LENGKAP
         run: |
-          # Buat folder kerja
           mkdir -p cert-output
           cd cert-output
 
@@ -29,18 +28,38 @@ jobs:
             -dname "CN=QGM, O=NSlocal, L=Pekanbaru, ST=Riau, C=ID" \
             -sigalg SHA256withRSA
 
-          # === 2. Export PEM Certificate ===
+          # === 2. Export PEM: CERT + PRIVATE KEY (format lengkap) ===
+          # Export cert + chain
           keytool -exportcert -alias release-key -keystore app-release-key.jks \
             -storepass QGMstore123 -rfc -file release-cert.pem
 
-          # === 3. Export CER Certificate ===
+          # === 3. Export CER format binary ===
           keytool -exportcert -alias release-key -keystore app-release-key.jks \
             -storepass QGMstore123 -file release-cert.cer
 
-          # === 4. Buat ZIP Semua ===
-          zip QGM-Certificate-Package.zip release-cert.pem release-cert.cer app-release-key.jks
+          # === 4. Export PEM + Private Key (untuk install tanpa error) ===
+          keytool -importkeystore -srckeystore app-release-key.jks \
+            -srcstorepass QGMstore123 -srcalias release-key \
+            -destkeystore temp-p12.p12 -deststoretype pkcs12 \
+            -deststorepass QGMstore123 -destkeypass QGMkey123
+
+          # Ekstrak Private Key + Cert ke PEM terpisah
+          openssl pkcs12 -in temp-p12.p12 -nodes -password pass:QGMstore123 -out release-full-key-cert.pem
+          openssl pkcs12 -in temp-p12.p12 -nokeys -password pass:QGMstore123 -out release-only-cert.pem
+
+          rm -f temp-p12.p12
+          ls -la
+
+          # === 5. Buat ZIP SEMUA FILE ===
+          zip QGM-Certificate-Package.zip \
+            release-cert.pem \
+            release-cert.cer \
+            release-full-key-cert.pem \
+            release-only-cert.pem \
+            app-release-key.jks
 
           ls -la
+          echo "✅ Semua file dibuat!"
 
       - name: 📦 Upload ZIP Hasil
         uses: actions/upload-artifact@v4
