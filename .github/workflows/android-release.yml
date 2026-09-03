@@ -13,12 +13,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: ✅ BUAT SEMUA FILE CERT + KEYSTORE
+      - name: ✅ BUAT PKCS12 (.p12) — CERT + KEY DALAM 1 FILE!
         run: |
           mkdir -p cert-output
           cd cert-output
 
-          # 🔑 Buat Keystore APK
+          # 1. Buat Keystore JKS
           keytool -genkeypair -v \
             -keystore app-release-key.jks \
             -alias release-key \
@@ -28,17 +28,19 @@ jobs:
             -dname "CN=QGM, O=NSlocal, L=Pekanbaru, ST=Riau, C=ID" \
             -sigalg SHA256withRSA
 
-          # 📄 Export CERT SAJA (tanpa key) — untuk Install CA Certificate ✅
-          keytool -exportcert -alias release-key -keystore app-release-key.jks \
-            -storepass QGMstore123 -rfc -file QGM-CA-CERT-ONLY.pem
+          # 2. EXPORT JADI PKCS12 — 1 FILE BERISI CERT + PRIVATE KEY! ✅
+          keytool -importkeystore \
+            -srckeystore app-release-key.jks -srcstoretype jks -srcstorepass QGMstore123 -srcalias release-key \
+            -destkeystore QGM-CERT-KEY.p12 -deststoretype pkcs12 -deststorepass QGMstore123 -destkeypass QGMkey123
 
+          # 3. Juga export cert terpisah untuk CA
           keytool -exportcert -alias release-key -keystore app-release-key.jks \
-            -storepass QGMstore123 -file QGM-CA-CERT-ONLY.cer
+            -storepass QGMstore123 -file QGM-CA-ONLY.cer
 
-          # 📦 Buat ZIP SEMUA
-          zip QGM-CERT-FULL.zip QGM-CA-CERT-ONLY.pem QGM-CA-CERT-ONLY.cer app-release-key.jks
+          # 4. ZIP SEMUA
+          zip QGM-CERT-FULL.zip QGM-CERT-KEY.p12 QGM-CA-ONLY.cer app-release-key.jks
           ls -la
-          echo "✅ SUDAH JADI! Download ZIP → pilih CA certificate → install QGM-CA-CERT-ONLY.cer / .pem"
+          echo "✅ FILE .p12 SUDAH JADI! Password: QGMstore123"
 
       - name: 📦 Upload ZIP
         uses: actions/upload-artifact@v4
