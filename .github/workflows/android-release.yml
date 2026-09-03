@@ -19,46 +19,37 @@ jobs:
           cd cert-output
 
           cat > ca-openssl.cnf << 'EOF'
-[req]
-distinguished_name = req_distinguished_name
-x509_extensions = v3_ca
-prompt = no
-
-[req_distinguished_name]
-CN = QGM Root CA
-O = NSlocal QGM
-L = Pekanbaru
-ST = Riau
-C = ID
-
-[v3_ca]
-basicConstraints = critical, CA:TRUE
-keyUsage = critical, keyCertSign, cRLSign
-subjectKeyIdentifier = hash
-EOF
+          
+         [req]
+         distinguished_name = req_distinguished_name
+         x509_extensions = v3_ca
+         prompt = no
+         
+         [req_distinguished_name]
+         CN = QGM Root CA
+         O = NSlocal QGM
+         L = Pekanbaru
+         ST = Riau
+         C = ID
+         
+         [v3_ca] basicConstraints = critical, CA:TRUE keyUsage = critical, keyCertSign, cRLSign subjectKeyIdentifier = hash EOF
 
           openssl genrsa -out ca-key.pem 2048
           openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -config ca-openssl.cnf -out QGM-ROOT-CA.pem
           openssl x509 -in QGM-ROOT-CA.pem -out QGM-ROOT-CA.cer -outform DER
 
           cat > user-openssl.cnf << 'EOF'
-[req]
-distinguished_name = req_distinguished_name
-req_extensions = v3_req
-prompt = no
-
-[req_distinguished_name]
-CN = QGM User Certificate
-O = NSlocal QGM
-L = Pekanbaru
-ST = Riau
-C = ID
-
-[v3_req]
-basicConstraints = CA:FALSE
-keyUsage = critical, digitalSignature, keyEncipherment
-extendedKeyUsage = clientAuth
-EOF
+          
+          [req] distinguished_name = req_distinguished_name req_extensions = v3_req prompt = no
+          
+          [req_distinguished_name]
+          CN = QGM User Certificate
+          O = NSlocal QGM
+          L = Pekanbaru
+          ST = Riau
+          C = ID
+          
+          [v3_req] basicConstraints = CA:FALSE keyUsage = critical, digitalSignature, keyEncipherment extendedKeyUsage = clientAuth EOF
 
           openssl genrsa -out user-key.pem 2048
           openssl req -new -key user-key.pem -config user-openssl.cnf -out user-csr.pem
