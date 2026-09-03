@@ -18,27 +18,20 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: ✅ PERBAIKI GRADLE WRAPPER (GENERATE FILE JAR RESMI)
+      - name: ✅ Buat Gradle Wrapper Resmi
         run: |
           cd /tmp
-          # Download Gradle 8.9 resmi
           wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip
           unzip -q gradle-8.9-bin.zip
           cd /home/runner/work/QGM/QGM
-          
-          # ⚡ COMMAND RESMI — buat ulang wrapper + JAR yang BENAR!
           /tmp/gradle-8.9/bin/gradle wrapper --gradle-version 8.9 --no-daemon
-          
-          # Cek hasil — ukuran JAR harus benar!
           ls -la gradle/wrapper/
-          
-          # Tes apakah berjalan
           ./gradlew --version --no-daemon
 
-      - name: Grant execute permission
+      - name: Beri Izin Jalankan
         run: chmod +x ./gradlew
 
-      - name: Clean
+      - name: Bersihkan Build Lama
         run: ./gradlew clean --no-daemon
 
       - name: Build Debug APK
@@ -51,13 +44,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
-      - name: Collect APK
+      - name: Kumpulkan APK
         run: |
           mkdir -p artifacts
           find app/build/outputs/apk -name "*.apk" -exec cp {} artifacts/ \;
+          ls -la artifacts/
 
-      - name: Upload APK Artifacts
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: APK-Builds
+          name: QGM-APK-Build
           path: artifacts/*.apk
+          
