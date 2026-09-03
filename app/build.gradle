@@ -18,10 +18,10 @@ android {
 
     signingConfigs {
         release {
-            storeFile file('../app-release-key.jks')
-            storePassword System.getenv('KEYSTORE_PASSWORD', 'QGMstore123')
-            keyAlias System.getenv('KEY_ALIAS', 'release-key')
-            keyPassword System.getenv('KEY_PASSWORD', 'QGMkey123')
+            storeFile file('app-release-key.jks')
+            storePassword System.getenv('KEYSTORE_PASSWORD')
+            keyAlias System.getenv('KEY_ALIAS')
+            keyPassword System.getenv('KEY_PASSWORD')
             v1SigningEnabled true
             v2SigningEnabled true
         }
