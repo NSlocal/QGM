@@ -18,25 +18,25 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Grant execute permission
+      - name: ✅ PERBAIKI GRADLE WRAPPER (GENERATE FILE JAR RESMI)
         run: |
-          chmod +x ./gradlew
-          ls -la gradle/wrapper/
-
-      - name: ✅ BUAT GRADLE WRAPPER RESMI (FIX FILE JAR)
-        run: |
-          # Download gradle 8.9 binary & generate proper wrapper JAR
           cd /tmp
+          # Download Gradle 8.9 resmi
           wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip
           unzip -q gradle-8.9-bin.zip
           cd /home/runner/work/QGM/QGM
-          # Ganti file JAR rusak dengan yang RESMI dari gradle 8.9
-          cp /tmp/gradle-8.9/lib/gradle-wrapper-8.9.jar gradle/wrapper/gradle-wrapper.jar
-          # Atau pakai command resmi gradle wrapper
+          
+          # ⚡ COMMAND RESMI — buat ulang wrapper + JAR yang BENAR!
           /tmp/gradle-8.9/bin/gradle wrapper --gradle-version 8.9 --no-daemon
-          # Cek ukuran — HARUS 65536 bytes!
+          
+          # Cek hasil — ukuran JAR harus benar!
           ls -la gradle/wrapper/
+          
+          # Tes apakah berjalan
           ./gradlew --version --no-daemon
+
+      - name: Grant execute permission
+        run: chmod +x ./gradlew
 
       - name: Clean
         run: ./gradlew clean --no-daemon
