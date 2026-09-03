@@ -5,5 +5,5 @@
 *.keystore
 release/
 artifacts/
-gradle/wrapper/gradle-wrapper.jar
+*.jar
 !gradle/wrapper/gradle-wrapper.jar
