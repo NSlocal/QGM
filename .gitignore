@@ -1,10 +1,9 @@
-*.iml
-.gradle/
-local.properties
-.idea/
-build/
-*/build/
-release.keystore
+*.apk
+*.ap_
+*.aab
 *.jks
 *.keystore
-*.pem
+release/
+artifacts/
+gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
