@@ -1,72 +1,66 @@
-name: Buat Certificate & Keystore
+name: Android Release Build
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  generate:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Java + OpenSSL
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Buat CA + User Cert + PKCS12
+      - name: Generate Gradle Wrapper
         run: |
-          mkdir -p cert-output
-          cd cert-output
+          cd /tmp
+          wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          unzip -q gradle-8.9-bin.zip
+          cd $GITHUB_WORKSPACE
+          /tmp/gradle-8.9/bin/gradle wrapper --gradle-version 8.9 --no-daemon
 
-          cat > ca-openssl.cnf << 'EOF'
-          
-         [req]
-         distinguished_name = req_distinguished_name
-         x509_extensions = v3_ca
-         prompt = no
-         
-         [req_distinguished_name]
-         CN = QGM Root CA
-         O = NSlocal QGM
-         L = Pekanbaru
-         ST = Riau
-         C = ID
-         
-         [v3_ca] basicConstraints = critical, CA:TRUE keyUsage = critical, keyCertSign, cRLSign subjectKeyIdentifier = hash EOF
+      - name: Restore Keystore from Secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_FILE }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > app/app-release-key.jks
+          ls -la app/
 
-          openssl genrsa -out ca-key.pem 2048
-          openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -config ca-openssl.cnf -out QGM-ROOT-CA.pem
-          openssl x509 -in QGM-ROOT-CA.pem -out QGM-ROOT-CA.cer -outform DER
+      - name: Set Execute Permission
+        run: chmod +x gradlew
 
-          cat > user-openssl.cnf << 'EOF'
-          
-          [req] distinguished_name = req_distinguished_name req_extensions = v3_req prompt = no
-          
-          [req_distinguished_name]
-          CN = QGM User Certificate
-          O = NSlocal QGM
-          L = Pekanbaru
-          ST = Riau
-          C = ID
-          
-          [v3_req] basicConstraints = CA:FALSE keyUsage = critical, digitalSignature, keyEncipherment extendedKeyUsage = clientAuth EOF
+      - name: Clean Project
+        run: ./gradlew clean --no-daemon
 
-          openssl genrsa -out user-key.pem 2048
-          openssl req -new -key user-key.pem -config user-openssl.cnf -out user-csr.pem
-          openssl x509 -req -in user-csr.pem -CA QGM-ROOT-CA.pem -CAkey ca-key.pem -CAcreateserial -out user-cert.pem -days 3650 -sha256
-          openssl pkcs12 -export -out QGM-USER-CERT-KEY.p12 -inkey user-key.pem -in user-cert.pem -certfile QGM-ROOT-CA.pem -name "QGM User Cert" -passout pass:QGMstore123
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-          keytool -genkeypair -v -keystore app-release-key.jks -alias release-key -keyalg RSA -keysize 2048 -validity 10000 -storepass QGMstore123 -keypass QGMkey123 -dname "CN=QGM App, O=NSlocal, L=Pekanbaru, ST=Riau, C=ID" -sigalg SHA256withRSA
+      - name: Build Release APK (Signed)
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
-          zip QGM-CERT-FULL.zip QGM-ROOT-CA.pem QGM-ROOT-CA.cer QGM-USER-CERT-KEY.p12 app-release-key.jks
-          ls -la
-          echo "✅ SUDAH JADI!"
-          echo "📁 QGM-ROOT-CA.cer → Install: CA certificate"
-          echo "📁 QGM-USER-CERT-KEY.p12 → Install: VPN & app user certificate"
-          echo "🔑 Password .p12: QGMstore123"
+      - name: Collect APK Files
+        run: |
+          mkdir -p outputs
+          find app/build/outputs/apk -name "*.apk" -exec cp {} outputs/ \;
+          ls -la outputs/
 
-      - name: Upload ZIP Hasil
+      - name: Upload APK Builds
         uses: actions/upload-artifact@v4
         with:
-          name: QGM-CERT-FULL-PACKAGE
-          path: cert-output/QGM-CERT-FULL.zip
+          name: QGM-APK-RELEASE
+          path: outputs/*.apk
+
+      - name: Cleanup Keystore
+        if: always()
+        run: rm -f app/app-release-key.jks
