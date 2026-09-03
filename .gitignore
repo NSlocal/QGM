@@ -7,3 +7,7 @@ release/
 artifacts/
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
+.gradle/
+build/
+*/build/
+local.properties
