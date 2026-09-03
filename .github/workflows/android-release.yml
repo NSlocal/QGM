@@ -13,37 +13,90 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: ✅ BUAT PKCS12 (.p12) — CERT + KEY DALAM 1 FILE!
+      - name: ✅ BUAT CA CERT + USER CERT + PKCS12
         run: |
           mkdir -p cert-output
           cd cert-output
 
-          # 1. Buat Keystore JKS
+          # === 1. BUAT CA ROOT CERT (bisa diinstall sebagai CA!) ✅ ===
+          cat > ca-openssl.cnf << 'EOF'
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_ca
+prompt = no
+
+[req_distinguished_name]
+CN = QGM Root CA
+O = NSlocal QGM
+L = Pekanbaru
+ST = Riau
+C = ID
+
+[v3_ca]
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always, issuer
+EOF
+
+          # Generate CA Key + Cert (PEM format — HP terima!)
+          openssl genrsa -out ca-key.pem 2048
+          openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -config ca-openssl.cnf -out QGM-ROOT-CA.pem
+          openssl x509 -in QGM-ROOT-CA.pem -out QGM-ROOT-CA.cer -outform DER
+
+          # === 2. BUAT USER CERT + PKCS12 (.p12) untuk VPN/app ✅ ===
+          cat > user-openssl.cnf << 'EOF'
+[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+CN = QGM User Cert
+O = NSlocal QGM
+L = Pekanbaru
+ST = Riau
+C = ID
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth, emailProtection
+EOF
+
+          # Generate User CSR + Key
+          openssl genrsa -out user-key.pem 2048
+          openssl req -new -key user-key.pem -config user-openssl.cnf -out user-csr.pem
+
+          # Tanda tangani dengan CA kita
+          openssl x509 -req -in user-csr.pem -CA QGM-ROOT-CA.pem -CAkey ca-key.pem -CAcreateserial -out user-cert.pem -days 3650 -sha256
+
+          # === 3. BUNGKUS USER CERT + KEY JADI PKCS12 (.p12) ✅ ===
+          openssl pkcs12 -export -out QGM-USER-CERT-KEY.p12 -inkey user-key.pem -in user-cert.pem -certfile QGM-ROOT-CA.pem -name "QGM User Certificate" -passout pass:QGMstore123
+
+          # === 4. Keystore JKS untuk APK ===
           keytool -genkeypair -v \
             -keystore app-release-key.jks \
             -alias release-key \
             -keyalg RSA -keysize 2048 -validity 10000 \
             -storepass QGMstore123 \
             -keypass QGMkey123 \
-            -dname "CN=QGM, O=NSlocal, L=Pekanbaru, ST=Riau, C=ID" \
+            -dname "CN=QGM App, O=NSlocal, L=Pekanbaru, ST=Riau, C=ID" \
             -sigalg SHA256withRSA
 
-          # 2. EXPORT JADI PKCS12 — 1 FILE BERISI CERT + PRIVATE KEY! ✅
-          keytool -importkeystore \
-            -srckeystore app-release-key.jks -srcstoretype jks -srcstorepass QGMstore123 -srcalias release-key \
-            -destkeystore QGM-CERT-KEY.p12 -deststoretype pkcs12 -deststorepass QGMstore123 -destkeypass QGMkey123
+          # === 5. ZIP SEMUA FILE ===
+          zip QGM-CERT-FULL.zip \
+            QGM-ROOT-CA.pem \
+            QGM-ROOT-CA.cer \
+            QGM-USER-CERT-KEY.p12 \
+            app-release-key.jks
 
-          # 3. Juga export cert terpisah untuk CA
-          keytool -exportcert -alias release-key -keystore app-release-key.jks \
-            -storepass QGMstore123 -file QGM-CA-ONLY.cer
-
-          # 4. ZIP SEMUA
-          zip QGM-CERT-FULL.zip QGM-CERT-KEY.p12 QGM-CA-ONLY.cer app-release-key.jks
           ls -la
-          echo "✅ FILE .p12 SUDAH JADI! Password: QGMstore123"
+          echo "✅ FILE SIAP! Password .p12: QGMstore123"
 
       - name: 📦 Upload ZIP
         uses: actions/upload-artifact@v4
         with:
           name: QGM-CERT-FULL-PACKAGE
           path: cert-output/QGM-CERT-FULL.zip
+          
