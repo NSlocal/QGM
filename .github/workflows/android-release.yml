@@ -23,11 +23,19 @@ jobs:
           chmod +x ./gradlew
           ls -la gradle/wrapper/
 
-      - name: Verify Gradle Wrapper
+      - name: ✅ BUAT GRADLE WRAPPER RESMI (FIX FILE JAR)
         run: |
-          test -f gradlew
-          test -f gradle/wrapper/gradle-wrapper.jar
-          test -f gradle/wrapper/gradle-wrapper.properties
+          # Download gradle 8.9 binary & generate proper wrapper JAR
+          cd /tmp
+          wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip
+          unzip -q gradle-8.9-bin.zip
+          cd /home/runner/work/QGM/QGM
+          # Ganti file JAR rusak dengan yang RESMI dari gradle 8.9
+          cp /tmp/gradle-8.9/lib/gradle-wrapper-8.9.jar gradle/wrapper/gradle-wrapper.jar
+          # Atau pakai command resmi gradle wrapper
+          /tmp/gradle-8.9/bin/gradle wrapper --gradle-version 8.9 --no-daemon
+          # Cek ukuran — HARUS 65536 bytes!
+          ls -la gradle/wrapper/
           ./gradlew --version --no-daemon
 
       - name: Clean
@@ -39,9 +47,9 @@ jobs:
       - name: Build Release APK
         run: ./gradlew assembleRelease --no-daemon --stacktrace
         env:
-          KEYSTORE_PASSWORD: QGMstore123
-          KEY_PASSWORD: QGMkey123
-          KEY_ALIAS: release-key
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
 
       - name: Collect APK
         run: |
