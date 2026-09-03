@@ -7,18 +7,18 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Java 17 + OpenSSL
+      - name: Set up Java + OpenSSL
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: ✅ BUAT KEYSTORE + CERT + PEM LENGKAP
+      - name: ✅ BUAT SEMUA FILE CERT + KEYSTORE
         run: |
           mkdir -p cert-output
           cd cert-output
 
-          # === 1. Buat Keystore .jks ===
+          # 🔑 Buat Keystore APK
           keytool -genkeypair -v \
             -keystore app-release-key.jks \
             -alias release-key \
@@ -28,41 +28,20 @@ jobs:
             -dname "CN=QGM, O=NSlocal, L=Pekanbaru, ST=Riau, C=ID" \
             -sigalg SHA256withRSA
 
-          # === 2. Export PEM: CERT + PRIVATE KEY (format lengkap) ===
-          # Export cert + chain
+          # 📄 Export CERT SAJA (tanpa key) — untuk Install CA Certificate ✅
           keytool -exportcert -alias release-key -keystore app-release-key.jks \
-            -storepass QGMstore123 -rfc -file release-cert.pem
+            -storepass QGMstore123 -rfc -file QGM-CA-CERT-ONLY.pem
 
-          # === 3. Export CER format binary ===
           keytool -exportcert -alias release-key -keystore app-release-key.jks \
-            -storepass QGMstore123 -file release-cert.cer
+            -storepass QGMstore123 -file QGM-CA-CERT-ONLY.cer
 
-          # === 4. Export PEM + Private Key (untuk install tanpa error) ===
-          keytool -importkeystore -srckeystore app-release-key.jks \
-            -srcstorepass QGMstore123 -srcalias release-key \
-            -destkeystore temp-p12.p12 -deststoretype pkcs12 \
-            -deststorepass QGMstore123 -destkeypass QGMkey123
-
-          # Ekstrak Private Key + Cert ke PEM terpisah
-          openssl pkcs12 -in temp-p12.p12 -nodes -password pass:QGMstore123 -out release-full-key-cert.pem
-          openssl pkcs12 -in temp-p12.p12 -nokeys -password pass:QGMstore123 -out release-only-cert.pem
-
-          rm -f temp-p12.p12
+          # 📦 Buat ZIP SEMUA
+          zip QGM-CERT-FULL.zip QGM-CA-CERT-ONLY.pem QGM-CA-CERT-ONLY.cer app-release-key.jks
           ls -la
+          echo "✅ SUDAH JADI! Download ZIP → pilih CA certificate → install QGM-CA-CERT-ONLY.cer / .pem"
 
-          # === 5. Buat ZIP SEMUA FILE ===
-          zip QGM-Certificate-Package.zip \
-            release-cert.pem \
-            release-cert.cer \
-            release-full-key-cert.pem \
-            release-only-cert.pem \
-            app-release-key.jks
-
-          ls -la
-          echo "✅ Semua file dibuat!"
-
-      - name: 📦 Upload ZIP Hasil
+      - name: 📦 Upload ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: QGM-Certificate-Full
-          path: cert-output/QGM-Certificate-Package.zip
+          name: QGM-CERT-FULL-PACKAGE
+          path: cert-output/QGM-CERT-FULL.zip
