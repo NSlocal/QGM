@@ -1,58 +1,49 @@
-name: Android Release
+name: Buat Certificate & Keystore
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: ✅ Buat Gradle Wrapper Resmi
+      - name: ✅ BUAT KEYSTORE + CERT + PEM + ZIP
         run: |
-          cd /tmp
-          wget -q https://services.gradle.org/distributions/gradle-8.9-bin.zip
-          unzip -q gradle-8.9-bin.zip
-          cd /home/runner/work/QGM/QGM
-          /tmp/gradle-8.9/bin/gradle wrapper --gradle-version 8.9 --no-daemon
-          ls -la gradle/wrapper/
-          ./gradlew --version --no-daemon
+          # Buat folder kerja
+          mkdir -p cert-output
+          cd cert-output
 
-      - name: Beri Izin Jalankan
-        run: chmod +x ./gradlew
+          # === 1. Buat Keystore .jks ===
+          keytool -genkeypair -v \
+            -keystore app-release-key.jks \
+            -alias release-key \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass QGMstore123 \
+            -keypass QGMkey123 \
+            -dname "CN=QGM, O=NSlocal, L=Pekanbaru, ST=Riau, C=ID" \
+            -sigalg SHA256withRSA
 
-      - name: Bersihkan Build Lama
-        run: ./gradlew clean --no-daemon
+          # === 2. Export PEM Certificate ===
+          keytool -exportcert -alias release-key -keystore app-release-key.jks \
+            -storepass QGMstore123 -rfc -file release-cert.pem
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+          # === 3. Export CER Certificate ===
+          keytool -exportcert -alias release-key -keystore app-release-key.jks \
+            -storepass QGMstore123 -file release-cert.cer
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          # === 4. Buat ZIP Semua ===
+          zip QGM-Certificate-Package.zip release-cert.pem release-cert.cer app-release-key.jks
 
-      - name: Kumpulkan APK
-        run: |
-          mkdir -p artifacts
-          find app/build/outputs/apk -name "*.apk" -exec cp {} artifacts/ \;
-          ls -la artifacts/
+          ls -la
 
-      - name: Upload APK
+      - name: 📦 Upload ZIP Hasil
         uses: actions/upload-artifact@v4
         with:
-          name: QGM-APK-Build
-          path: artifacts/*.apk
-          
+          name: QGM-Certificate-Full
+          path: cert-output/QGM-Certificate-Package.zip
