@@ -1,0 +1,90 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      APP_NAME: "QQ飞车 / Speed Drifters Performance"
+      PACKAGE_NAME: "com.example.performancehelper"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Make Gradle executable
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      # Optional release signing. No private key is stored in this repository.
+      # Add KEYSTORE_B64, KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD
+      # as GitHub Actions secrets to enable signedRelease.apk.
+      - name: Decode signing keystore
+        if: ${{ secrets.KEYSTORE_B64 != '' }}
+        shell: bash
+        run: |
+          echo "${{ secrets.KEYSTORE_B64 }}" | base64 -d > release.keystore
+
+      - name: Build signed release
+        if: ${{ secrets.KEYSTORE_B64 != '' }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew assembleRelease --no-daemon
+          mkdir -p release
+          cp app/build/outputs/apk/release/app-release.apk release/QQSpeed-Performance-release.apk
+
+      - name: Extract public certificate as PEM
+        shell: bash
+        run: |
+          mkdir -p release
+          if [ -f release.keystore ]; then
+            keytool -exportcert -rfc \
+              -keystore release.keystore \
+              -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+              -alias "${{ secrets.KEY_ALIAS }}" \
+              -file release/signing-certificate.pem
+          else
+            echo "No release keystore configured; PEM export skipped." > release/README-cert.txt
+          fi
+
+      - name: Copy debug APK
+        run: |
+          mkdir -p release
+          cp app/build/outputs/apk/debug/app-debug.apk release/QQSpeed-Performance-debug.apk
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: release/
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            release/*.apk
+            release/*.pem
+            release/*.txt
+            
